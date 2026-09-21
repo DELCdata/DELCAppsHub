@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<!--
+  DELC Apps Hub — single sign-on style launcher for the four DELC apps.
+  Each tile links out to that app's own GitHub Pages site. All four apps
+  share one consolidated Supabase project (DELCFBPortal).
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DELC Apps Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#1a3355;--navyD:#122440;--gold:#c9973a;--cream:#fdf8f2;
+  --sand:#f5ede0;--border:#e4d8c8;--muted:#7a6a55;--red:#b91c1c;
+}
+body{font-family:'Lato',sans-serif;background:var(--sand);color:#1a1a1a;min-height:100vh}
+.btn{font-family:inherit;border-radius:8px;padding:10px 16px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:700;border:1px solid var(--border);background:#fff;color:#1a1a1a;transition:opacity .15s;width:100%}
+.btn:hover{opacity:.85}
+.btn-primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+.inp{border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;background:#fff;color:#1a1a1a;font-family:inherit;width:100%;outline:none}
+.inp:focus{border-color:var(--gold)}
+.lbl{font-size:11px;color:var(--muted);margin-bottom:5px;display:block;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+
+/* ── LOGIN ── */
+#login-screen{min-height:100vh;background:linear-gradient(rgba(18,36,64,.88),rgba(18,36,64,.94)),url('https://storage1.snappages.site/GKKB9P/assets/images/22750931_1920x1080_500.png') center/cover no-repeat;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{background:rgba(255,255,255,.97);border-radius:20px;padding:36px;box-shadow:0 24px 60px rgba(0,0,0,.4);width:100%;max-width:400px}
+.login-divider{height:3px;background:linear-gradient(90deg,var(--navy),var(--gold));border-radius:2px;width:60px;margin:0 auto 14px}
+.login-title{font-size:21px;font-weight:900;color:var(--navy);text-align:center;letter-spacing:-.5px;margin-bottom:4px}
+.login-sub{font-size:12px;color:var(--muted);text-align:center;margin-bottom:24px}
+.login-error{background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:9px 12px;font-size:12px;color:var(--red);margin-bottom:14px;font-weight:700;display:none}
+.field{margin-bottom:14px}
+.shake{animation:shk .4s ease}
+@keyframes shk{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+
+/* ── HUB ── */
+#hub-screen{display:none;min-height:100vh;flex-direction:column}
+.top-nav{background:var(--navy);padding:14px 20px;display:flex;align-items:center;gap:10px;min-height:54px;flex-wrap:wrap}
+.nav-title{flex:1;color:#fff;font-size:15px;font-weight:900;letter-spacing:-.3px}
+.nav-sub{font-size:11px;color:rgba(255,255,255,.5);margin-right:6px}
+.nav-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#fff;font-size:11px;padding:7px 12px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:700}
+.nav-btn:hover{background:rgba(255,255,255,.18)}
+.hero{background:linear-gradient(135deg,var(--navy),var(--navyD));padding:28px 20px 34px;text-align:center}
+.hero-label{color:rgba(255,255,255,.6);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.hero-title{color:#fff;font-size:24px;font-weight:900;letter-spacing:-.4px}
+.content{padding:26px 20px 50px;flex:1;max-width:900px;margin:0 auto;width:100%}
+.tile-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.tile{background:#fff;border:1px solid var(--border);border-radius:14px;padding:22px 20px;text-decoration:none;color:#1a1a1a;display:flex;flex-direction:column;gap:8px;transition:transform .12s,box-shadow .12s;box-shadow:0 2px 6px rgba(0,0,0,.04)}
+.tile:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(26,51,85,.14);border-color:var(--gold)}
+.tile-icon{font-size:32px}
+.tile-name{font-size:16px;font-weight:900;color:var(--navy)}
+.tile-desc{font-size:12px;color:var(--muted);line-height:1.4}
+.tile-go{margin-top:auto;font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.04em}
+.footnote{text-align:center;font-size:11px;color:var(--muted);margin-top:30px}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-divider"></div>
+    <div class="login-title">DELC Apps Hub</div>
+    <div class="login-sub">Duncansville Evangelical Lutheran Church</div>
+    <div id="login-error" class="login-error">Incorrect password. Please try again.</div>
+    <form id="login-form">
+      <div class="field">
+        <label class="lbl">Username</label>
+        <input class="inp" id="username" type="text" placeholder="e.g. ddetrich" autocomplete="username" autofocus>
+      </div>
+      <div class="field">
+        <label class="lbl">Password</label>
+        <input class="inp" id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary">Sign In</button>
+    </form>
+  </div>
+</div>
+
+<div id="hub-screen">
+  <div class="top-nav">
+    <div class="nav-title">DELC Apps Hub</div>
+    <span class="nav-sub" id="welcome-msg"></span>
+    <button class="nav-btn" id="logout-btn">Log Out</button>
+  </div>
+  <div class="hero">
+    <div class="hero-label">Duncansville Evangelical Lutheran Church</div>
+    <div class="hero-title">Choose an app</div>
+  </div>
+  <div class="content">
+    <div class="tile-grid">
+      <a class="tile" href="https://delcdata.github.io/FBEventPotal/" target="_blank" rel="noopener">
+        <div class="tile-icon">🍽️</div>
+        <div class="tile-name">F&amp;B Event Management</div>
+        <div class="tile-desc">Plan and track food &amp; beverage events, purchases, offerings, and volunteers.</div>
+        <div class="tile-go">Open App →</div>
+      </a>
+      <a class="tile" href="https://delcdata.github.io/MugPOS/" target="_blank" rel="noopener">
+        <div class="tile-icon">☕</div>
+        <div class="tile-name">Motivational Mug POS</div>
+        <div class="tile-desc">Point-of-sale for the Motivational Mug coffee shop — menu, orders, and closeouts.</div>
+        <div class="tile-go">Open App →</div>
+      </a>
+      <a class="tile" href="https://delcdata.github.io/HSPMugPantry/" target="_blank" rel="noopener">
+        <div class="tile-icon">🥫</div>
+        <div class="tile-name">HS Pantry System</div>
+        <div class="tile-desc">Manage food pantry inventory, receiving, dispensing, and stock counts.</div>
+        <div class="tile-go">Open App →</div>
+      </a>
+      <a class="tile" href="https://delcdata.github.io/DELCPetPantry/" target="_blank" rel="noopener">
+        <div class="tile-icon">🐾</div>
+        <div class="tile-name">Pet Pantry System</div>
+        <div class="tile-desc">Manage pet food &amp; supply inventory, donations, and client distributions.</div>
+        <div class="tile-go">Open App →</div>
+      </a>
+    </div>
+    <div class="footnote">Each app opens in a new tab and has its own sign-in. All four share one connected database.</div>
+  </div>
+</div>
+
+<script>
+const PASSWORD = 'Delc.1200!';
+
+const loginScreen = document.getElementById('login-screen');
+const hubScreen = document.getElementById('hub-screen');
+const loginForm = document.getElementById('login-form');
+const loginError = document.getElementById('login-error');
+const usernameInput = document.getElementById('username');
+const passwordInput = document.getElementById('password');
+const welcomeMsg = document.getElementById('welcome-msg');
+const logoutBtn = document.getElementById('logout-btn');
+const loginBox = document.querySelector('.login-box');
+
+loginForm.addEventListener('submit', function(e){
+  e.preventDefault();
+  const u = usernameInput.value.trim().toLowerCase();
+  const p = passwordInput.value;
+  loginError.style.display = 'none';
+
+  if (!u) {
+    loginError.textContent = 'Please enter your username.';
+    loginError.style.display = 'block';
+    return;
+  }
+  if (!/^[a-z][a-z]+$/.test(u)) {
+    loginError.textContent = 'Username format: first initial + last name (e.g. ddetrich).';
+    loginError.style.display = 'block';
+    return;
+  }
+  if (p !== PASSWORD) {
+    loginError.textContent = 'Incorrect password. Please try again.';
+    loginError.style.display = 'block';
+    loginBox.classList.add('shake');
+    setTimeout(() => loginBox.classList.remove('shake'), 400);
+    return;
+  }
+
+  welcomeMsg.textContent = 'Signed in as ' + u;
+  loginScreen.style.display = 'none';
+  hubScreen.style.display = 'flex';
+});
+
+logoutBtn.addEventListener('click', function(){
+  usernameInput.value = '';
+  passwordInput.value = '';
+  hubScreen.style.display = 'none';
+  loginScreen.style.display = 'flex';
+});
+</script>
+
+</body>
+</html>
