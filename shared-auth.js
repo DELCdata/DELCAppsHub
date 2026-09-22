@@ -10,7 +10,7 @@
 (function (global) {
   var SESSION_KEY = 'delc_hub_session';
   var SUPABASE_URL = 'https://ksdxhqyusaylfpyeecbv.supabase.co';
-  var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtzergk3hxeXVzYXlscGZ5ZWVjYnYiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc4ODU1MTU0OCwiZXhwIjoyMTA0MTI3NTQ4fQ.6HI0XWmlIfzyVy0iRH2GkAVNqYIZQwMeNhr4drTOUNo';
+  var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtzZHhocXl1c2F5bGZweWVlY2J2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1NTE1NDgsImV4cCI6MjEwNDEyNzU0OH0.6HI0XWmlIfzyVy0iRH2GkAVNqYIZQwMeNhr4drTOUNo';
 
   var APP_LABELS = {
     fb: 'F&B Event Management',
