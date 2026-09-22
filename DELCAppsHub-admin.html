@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<!--
+  DELC Apps Hub — Admin Portal.
+  Create/edit/delete hub_users (the shared login used by the hub and all
+  four apps) and control which apps each person can access.
+  Only visible to accounts with is_admin = true in hub_users.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DELC Admin Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+<script src="./shared-auth.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#1a3355;--navyD:#122440;--gold:#c9973a;--cream:#fdf8f2;
+  --sand:#f5ede0;--border:#e4d8c8;--muted:#7a6a55;--red:#b91c1c;--green:#1a6e3c;
+}
+body{font-family:'Lato',sans-serif;background:var(--sand);color:#1a1a1a;min-height:100vh}
+.btn{font-family:inherit;border-radius:8px;padding:9px 14px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:700;border:1px solid var(--border);background:#fff;color:#1a1a1a;transition:opacity .15s}
+.btn:hover{opacity:.85}
+.btn:disabled{opacity:.5;cursor:default}
+.btn-primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn-danger{background:#fee2e2;color:var(--red);border-color:#fca5a5}
+.btn-block{width:100%}
+.inp{border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:13px;background:#fff;color:#1a1a1a;font-family:inherit;width:100%;outline:none}
+.inp:focus{border-color:var(--gold)}
+.lbl{font-size:11px;color:var(--muted);margin-bottom:5px;display:block;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.field{margin-bottom:12px}
+
+/* ── LOGIN / DENIED ── */
+#login-screen{min-height:100vh;background:linear-gradient(rgba(18,36,64,.88),rgba(18,36,64,.94)),url('https://storage1.snappages.site/GKKB9P/assets/images/22750931_1920x1080_500.png') center/cover no-repeat;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{background:rgba(255,255,255,.97);border-radius:20px;padding:36px;box-shadow:0 24px 60px rgba(0,0,0,.4);width:100%;max-width:400px;text-align:center}
+.login-divider{height:3px;background:linear-gradient(90deg,var(--navy),var(--gold));border-radius:2px;width:60px;margin:0 auto 14px}
+.login-title{font-size:21px;font-weight:900;color:var(--navy);letter-spacing:-.5px;margin-bottom:4px}
+.login-sub{font-size:12px;color:var(--muted);margin-bottom:24px}
+.login-error{background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:9px 12px;font-size:12px;color:var(--red);margin-bottom:14px;font-weight:700;display:none;text-align:left}
+.shake{animation:shk .4s ease}
+@keyframes shk{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.text-left{text-align:left}
+
+/* ── ADMIN SCREEN ── */
+#admin-screen{display:none;min-height:100vh;flex-direction:column}
+.top-nav{background:var(--navy);padding:14px 20px;display:flex;align-items:center;gap:10px;min-height:54px;flex-wrap:wrap}
+.nav-title{flex:1;color:#fff;font-size:15px;font-weight:900;letter-spacing:-.3px}
+.nav-sub{font-size:11px;color:rgba(255,255,255,.5);margin-right:6px}
+.nav-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#fff;font-size:11px;padding:7px 12px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:700;text-decoration:none;display:inline-flex;align-items:center}
+.nav-btn:hover{background:rgba(255,255,255,.18)}
+.content{padding:22px 20px 60px;flex:1;max-width:960px;margin:0 auto;width:100%}
+.card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:20px}
+.card-title{font-size:15px;font-weight:900;color:var(--navy);margin-bottom:14px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.app-checks{display:flex;gap:14px;flex-wrap:wrap;margin-top:4px}
+.app-check{display:flex;align-items:center;gap:6px;font-size:13px}
+.form-actions{display:flex;gap:10px;margin-top:16px}
+.form-actions .btn{flex:0 0 auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:8px 10px;border-bottom:2px solid var(--border)}
+td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top}
+.badge{display:inline-block;background:var(--cream);border:1px solid var(--border);border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700;color:var(--navy);margin:2px 3px 0 0}
+.badge-admin{background:var(--navy);color:#fff;border-color:var(--navy)}
+.row-actions{display:flex;gap:6px;flex-wrap:wrap}
+.row-actions .btn{padding:6px 10px;font-size:11px}
+.muted{color:var(--muted);font-size:12px}
+.empty-row td{text-align:center;color:var(--muted);padding:26px}
+#user-form{display:none}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-box" id="login-box">
+    <div class="login-divider"></div>
+    <div class="login-title">Admin Portal</div>
+    <div class="login-sub">Sign in with an admin account</div>
+    <div id="login-error" class="login-error"></div>
+    <form id="login-form" class="text-left">
+      <div class="field">
+        <label class="lbl">Username</label>
+        <input class="inp" id="username" type="text" placeholder="e.g. ddetrich" autocomplete="username" autofocus>
+      </div>
+      <div class="field">
+        <label class="lbl">Password</label>
+        <input class="inp" id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="login-btn">Sign In</button>
+    </form>
+    <div style="margin-top:16px"><a href="./index.html" style="font-size:12px;color:var(--muted)">← Back to hub</a></div>
+  </div>
+</div>
+
+<div id="denied-screen" style="display:none;min-height:100vh;align-items:center;justify-content:center;flex-direction:column;gap:14px;text-align:center;padding:20px">
+  <div style="font-size:40px">🔒</div>
+  <div style="font-size:16px;font-weight:900;color:var(--navy)">This account doesn't have admin access</div>
+  <div class="muted">Ask an existing admin to grant your account admin access from this portal.</div>
+  <a href="./index.html" class="btn btn-primary" style="width:auto;padding:10px 20px">← Back to hub</a>
+</div>
+
+<div id="admin-screen">
+  <div class="top-nav">
+    <div class="nav-title">DELC Admin Portal</div>
+    <span class="nav-sub" id="welcome-msg"></span>
+    <a class="nav-btn" href="./index.html">← Hub</a>
+    <button class="nav-btn" id="logout-btn">Log Out</button>
+  </div>
+  <div class="content">
+
+    <div class="card">
+      <div class="card-title" id="form-title">Add User</div>
+      <form id="user-form">
+        <input type="hidden" id="edit-id">
+        <div class="grid-2">
+          <div class="field">
+            <label class="lbl">Full name</label>
+            <input class="inp" id="f-display-name" placeholder="Derek Detrich">
+          </div>
+          <div class="field">
+            <label class="lbl">Email</label>
+            <input class="inp" id="f-email" type="email" placeholder="name@mydelc.org">
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label class="lbl">Username</label>
+            <input class="inp" id="f-username" placeholder="e.g. ddetrich" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl">Password <span id="pw-hint" class="muted" style="text-transform:none;font-weight:400"></span></label>
+            <input class="inp" id="f-password" type="password" placeholder="••••••••" autocomplete="new-password">
+          </div>
+        </div>
+        <div class="field">
+          <label class="lbl">App access</label>
+          <div class="app-checks">
+            <label class="app-check"><input type="checkbox" value="fb" class="app-cb"> F&amp;B Event Management</label>
+            <label class="app-check"><input type="checkbox" value="mug" class="app-cb"> Motivational Mug POS</label>
+            <label class="app-check"><input type="checkbox" value="pantry" class="app-cb"> HS Pantry System</label>
+            <label class="app-check"><input type="checkbox" value="pet" class="app-cb"> Pet Pantry System</label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="app-check"><input type="checkbox" id="f-is-admin"> Admin (can manage users in this portal)</label>
+        </div>
+        <div id="form-error" class="login-error"></div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" id="save-btn">Save User</button>
+          <button type="button" class="btn" id="cancel-edit-btn" style="display:none">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Users</div>
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Username</th><th>Email</th><th>Apps</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="user-rows">
+          <tr class="empty-row"><td colspan="5">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const APP_KEYS = ['fb', 'mug', 'pantry', 'pet'];
+
+const loginScreen = document.getElementById('login-screen');
+const deniedScreen = document.getElementById('denied-screen');
+const adminScreen = document.getElementById('admin-screen');
+const loginForm = document.getElementById('login-form');
+const loginError = document.getElementById('login-error');
+const loginBtn = document.getElementById('login-btn');
+const usernameInput = document.getElementById('username');
+const passwordInput = document.getElementById('password');
+const loginBox = document.getElementById('login-box');
+const welcomeMsg = document.getElementById('welcome-msg');
+const logoutBtn = document.getElementById('logout-btn');
+
+const userForm = document.getElementById('user-form');
+const formTitle = document.getElementById('form-title');
+const editIdInput = document.getElementById('edit-id');
+const fDisplayName = document.getElementById('f-display-name');
+const fEmail = document.getElementById('f-email');
+const fUsername = document.getElementById('f-username');
+const fPassword = document.getElementById('f-password');
+const pwHint = document.getElementById('pw-hint');
+const fIsAdmin = document.getElementById('f-is-admin');
+const appCbs = Array.from(document.querySelectorAll('.app-cb'));
+const formError = document.getElementById('form-error');
+const saveBtn = document.getElementById('save-btn');
+const cancelEditBtn = document.getElementById('cancel-edit-btn');
+const userRows = document.getElementById('user-rows');
+
+function showScreen(name) {
+  loginScreen.style.display = name === 'login' ? 'flex' : 'none';
+  deniedScreen.style.display = name === 'denied' ? 'flex' : 'none';
+  adminScreen.style.display = name === 'admin' ? 'flex' : 'none';
+}
+
+function resetForm() {
+  userForm.reset();
+  editIdInput.value = '';
+  formTitle.textContent = 'Add User';
+  pwHint.textContent = '(required for a new user)';
+  saveBtn.textContent = 'Save User';
+  cancelEditBtn.style.display = 'none';
+  formError.style.display = 'none';
+}
+
+async function fetchUsers() {
+  const res = await fetch(DelcAuth.SUPABASE_URL + '/rest/v1/hub_users?select=*&order=username.asc', {
+    headers: DelcAuth.restHeaders()
+  });
+  if (!res.ok) throw new Error('Could not load users (' + res.status + ')');
+  return res.json();
+}
+
+function appBadges(user) {
+  let html = '';
+  if (user.is_admin) html += '<span class="badge badge-admin">Admin</span>';
+  (user.allowed_apps || []).forEach(key => {
+    html += '<span class="badge">' + (DelcAuth.APP_LABELS[key] || key) + '</span>';
+  });
+  if (!html) html = '<span class="muted">No access yet</span>';
+  return html;
+}
+
+async function renderUsers() {
+  let users;
+  try {
+    users = await fetchUsers();
+  } catch (e) {
+    userRows.innerHTML = '<tr class="empty-row"><td colspan="5">Could not load users. Try refreshing.</td></tr>';
+    return;
+  }
+  if (!users.length) {
+    userRows.innerHTML = '<tr class="empty-row"><td colspan="5">No users yet — add the first one above.</td></tr>';
+    return;
+  }
+  userRows.innerHTML = users.map(u => `
+    <tr>
+      <td>${u.display_name || '—'}</td>
+      <td>${u.username}</td>
+      <td>${u.email || '—'}</td>
+      <td>${appBadges(u)}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn" data-edit="${u.id}">Edit</button>
+          <button class="btn btn-danger" data-delete="${u.id}" data-username="${u.username}">Delete</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+
+  userRows.querySelectorAll('[data-edit]').forEach(btn => {
+    btn.addEventListener('click', () => startEdit(btn.getAttribute('data-edit'), users));
+  });
+  userRows.querySelectorAll('[data-delete]').forEach(btn => {
+    btn.addEventListener('click', () => deleteUser(btn.getAttribute('data-delete'), btn.getAttribute('data-username')));
+  });
+}
+
+function startEdit(id, users) {
+  const u = users.find(x => x.id === id);
+  if (!u) return;
+  editIdInput.value = u.id;
+  fDisplayName.value = u.display_name || '';
+  fEmail.value = u.email || '';
+  fUsername.value = u.username;
+  fPassword.value = '';
+  pwHint.textContent = '(leave blank to keep current password)';
+  fIsAdmin.checked = !!u.is_admin;
+  appCbs.forEach(cb => { cb.checked = (u.allowed_apps || []).includes(cb.value); });
+  formTitle.textContent = 'Edit User';
+  saveBtn.textContent = 'Save Changes';
+  cancelEditBtn.style.display = 'inline-flex';
+  formError.style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+cancelEditBtn.addEventListener('click', resetForm);
+
+async function deleteUser(id, username) {
+  if (!confirm('Remove ' + username + '\'s account? They will lose access to every app.')) return;
+  const res = await fetch(DelcAuth.SUPABASE_URL + '/rest/v1/hub_users?id=eq.' + encodeURIComponent(id), {
+    method: 'DELETE',
+    headers: DelcAuth.restHeaders()
+  });
+  if (!res.ok) { alert('Could not delete user.'); return; }
+  renderUsers();
+}
+
+function slugUsername(name) {
+  return name.trim().toLowerCase().replace(/[^a-z]/g, '');
+}
+
+userForm.addEventListener('submit', async function (e) {
+  e.preventDefault();
+  formError.style.display = 'none';
+
+  const isEdit = !!editIdInput.value;
+  const username = slugUsername(fUsername.value);
+  const displayName = fDisplayName.value.trim();
+  const email = fEmail.value.trim();
+  const password = fPassword.value;
+  const allowedApps = appCbs.filter(cb => cb.checked).map(cb => cb.value);
+  const isAdmin = fIsAdmin.checked;
+
+  if (!username) {
+    formError.textContent = 'Username is required (letters only, e.g. ddetrich).';
+    formError.style.display = 'block';
+    return;
+  }
+  if (!isEdit && !password) {
+    formError.textContent = 'A password is required for a new user.';
+    formError.style.display = 'block';
+    return;
+  }
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+
+  try {
+    let payload = {
+      email: email,
+      username: username,
+      display_name: displayName || username,
+      allowed_apps: allowedApps,
+      is_admin: isAdmin,
+      updated_at: new Date().toISOString()
+    };
+
+    if (password) {
+      const salt = DelcAuth.genSalt();
+      payload.salt = salt;
+      payload.password_hash = await DelcAuth.hashPassword(password, salt);
+    }
+
+    let res;
+    if (isEdit) {
+      res = await fetch(DelcAuth.SUPABASE_URL + '/rest/v1/hub_users?id=eq.' + encodeURIComponent(editIdInput.value), {
+        method: 'PATCH',
+        headers: DelcAuth.restHeaders(),
+        body: JSON.stringify(payload)
+      });
+    } else {
+      payload.id = 'u_' + username + '_' + Math.random().toString(36).slice(2, 8);
+      res = await fetch(DelcAuth.SUPABASE_URL + '/rest/v1/hub_users', {
+        method: 'POST',
+        headers: Object.assign({ Prefer: 'return=minimal' }, DelcAuth.restHeaders()),
+        body: JSON.stringify(payload)
+      });
+    }
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text.indexOf('duplicate') !== -1 ? 'That username is already taken.' : 'Save failed.');
+    }
+
+    resetForm();
+    renderUsers();
+  } catch (err) {
+    formError.textContent = err.message || 'Something went wrong saving this user.';
+    formError.style.display = 'block';
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = isEdit ? 'Save Changes' : 'Save User';
+  }
+});
+
+// ── Login gate ──
+function enterAdmin(session) {
+  welcomeMsg.textContent = 'Signed in as ' + (session.displayName || session.username);
+  showScreen('admin');
+  resetForm();
+  renderUsers();
+}
+
+const existing = DelcAuth.getSession();
+if (existing) {
+  if (existing.isAdmin) {
+    enterAdmin(existing);
+  } else {
+    showScreen('denied');
+  }
+} else {
+  showScreen('login');
+}
+
+loginForm.addEventListener('submit', async function (e) {
+  e.preventDefault();
+  loginError.style.display = 'none';
+  const u = usernameInput.value.trim();
+  const p = passwordInput.value;
+  if (!u || !p) {
+    loginError.textContent = 'Please enter your username and password.';
+    loginError.style.display = 'block';
+    return;
+  }
+  loginBtn.disabled = true;
+  loginBtn.textContent = 'Signing in…';
+  const result = await DelcAuth.login(u, p);
+  loginBtn.disabled = false;
+  loginBtn.textContent = 'Sign In';
+  if (!result.ok) {
+    loginError.textContent = result.error;
+    loginError.style.display = 'block';
+    loginBox.classList.add('shake');
+    setTimeout(() => loginBox.classList.remove('shake'), 400);
+    return;
+  }
+  if (!result.session.isAdmin) {
+    showScreen('denied');
+    return;
+  }
+  enterAdmin(result.session);
+});
+
+logoutBtn.addEventListener('click', function () {
+  DelcAuth.clearSession();
+  usernameInput.value = '';
+  passwordInput.value = '';
+  showScreen('login');
+});
+</script>
+
+</body>
+</html>
