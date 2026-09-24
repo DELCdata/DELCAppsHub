@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<!--
+  DELC Apps Hub — single sign-on launcher for the DELC apps.
+  The list of app tiles is loaded from the hub_apps table (Admin Portal → Apps).
+  Login is checked against the hub_users table in the shared Supabase project.
+  A successful login is stored in localStorage (shared-auth.js) so the hub,
+  the Admin Portal, and all four apps (same delcdata.github.io origin) all
+  recognize the same session without asking again.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DELC Apps Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+<script src="./shared-auth.js?v=3"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#1a3355;--navyD:#122440;--gold:#c9973a;--cream:#fdf8f2;
+  --sand:#f5ede0;--border:#e4d8c8;--muted:#7a6a55;--red:#b91c1c;
+}
+body{font-family:'Lato',sans-serif;background:var(--sand);color:#1a1a1a;min-height:100vh}
+.btn{font-family:inherit;border-radius:8px;padding:10px 16px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:700;border:1px solid var(--border);background:#fff;color:#1a1a1a;transition:opacity .15s;width:100%}
+.btn:hover{opacity:.85}
+.btn-primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn-primary:disabled{opacity:.6;cursor:default}
+.inp{border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;background:#fff;color:#1a1a1a;font-family:inherit;width:100%;outline:none}
+.inp:focus{border-color:var(--gold)}
+.lbl{font-size:11px;color:var(--muted);margin-bottom:5px;display:block;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+
+/* ── LOGIN ── */
+#login-screen{min-height:100vh;background:linear-gradient(rgba(18,36,64,.88),rgba(18,36,64,.94)),url('https://storage1.snappages.site/GKKB9P/assets/images/22750931_1920x1080_500.png') center/cover no-repeat;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{background:rgba(255,255,255,.97);border-radius:20px;padding:36px;box-shadow:0 24px 60px rgba(0,0,0,.4);width:100%;max-width:400px}
+.login-divider{height:3px;background:linear-gradient(90deg,var(--navy),var(--gold));border-radius:2px;width:60px;margin:0 auto 14px}
+.login-title{font-size:21px;font-weight:900;color:var(--navy);text-align:center;letter-spacing:-.5px;margin-bottom:4px}
+.login-sub{font-size:12px;color:var(--muted);text-align:center;margin-bottom:24px}
+.login-error{background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:9px 12px;font-size:12px;color:var(--red);margin-bottom:14px;font-weight:700;display:none}
+.field{margin-bottom:14px}
+.shake{animation:shk .4s ease}
+@keyframes shk{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+
+/* ── HUB ── */
+#hub-screen{display:none;min-height:100vh;flex-direction:column}
+.top-nav{background:var(--navy);padding:14px 20px;display:flex;align-items:center;gap:10px;min-height:54px;flex-wrap:wrap}
+.nav-title{flex:1;color:#fff;font-size:15px;font-weight:900;letter-spacing:-.3px}
+.nav-sub{font-size:11px;color:rgba(255,255,255,.5);margin-right:6px}
+.nav-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#fff;font-size:11px;padding:7px 12px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:700}
+.nav-btn:hover{background:rgba(255,255,255,.18)}
+.hero{background:linear-gradient(135deg,var(--navy),var(--navyD));padding:28px 20px 34px;text-align:center}
+.hero-label{color:rgba(255,255,255,.6);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.hero-title{color:#fff;font-size:24px;font-weight:900;letter-spacing:-.4px}
+.content{padding:26px 20px 50px;flex:1;max-width:900px;margin:0 auto;width:100%}
+.tile-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.tile{background:#fff;border:1px solid var(--border);border-radius:14px;padding:22px 20px;text-decoration:none;color:#1a1a1a;display:flex;flex-direction:column;gap:8px;transition:transform .12s,box-shadow .12s;box-shadow:0 2px 6px rgba(0,0,0,.04)}
+.tile:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(26,51,85,.14);border-color:var(--gold)}
+.tile-icon{font-size:32px}
+.tile-name{font-size:16px;font-weight:900;color:var(--navy)}
+.tile-desc{font-size:12px;color:var(--muted);line-height:1.4}
+.tile-go{margin-top:auto;font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.04em}
+.tile-admin{border-style:dashed;border-color:var(--gold)}
+.footnote{text-align:center;font-size:11px;color:var(--muted);margin-top:30px}
+.empty-note{text-align:center;color:var(--muted);font-size:13px;padding:30px 0}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-box" id="login-box">
+    <div class="login-divider"></div>
+    <div class="login-title">DELC Apps Hub</div>
+    <div class="login-sub">Duncansville Evangelical Lutheran Church</div>
+    <div id="login-error" class="login-error"></div>
+    <form id="login-form">
+      <div class="field">
+        <label class="lbl">Username</label>
+        <input class="inp" id="username" type="text" placeholder="e.g. ddetrich" autocomplete="username" autofocus>
+      </div>
+      <div class="field">
+        <label class="lbl">Password</label>
+        <input class="inp" id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary" id="login-btn">Sign In</button>
+    </form>
+  </div>
+</div>
+
+<div id="hub-screen">
+  <div class="top-nav">
+    <div class="nav-title">DELC Apps Hub</div>
+    <span class="nav-sub" id="welcome-msg"></span>
+    <button class="nav-btn" id="logout-btn">Log Out</button>
+  </div>
+  <div class="hero">
+    <div class="hero-label">Duncansville Evangelical Lutheran Church</div>
+    <div class="hero-title">Choose an app</div>
+  </div>
+  <div class="content">
+    <div class="tile-grid" id="tile-grid">
+      <div class="empty-note" style="grid-column:1/-1">Loading apps…</div>
+    </div>
+    <div class="empty-note" id="empty-note" style="display:none">You don't have access to any apps yet. Ask an admin to grant you access.</div>
+    <div class="footnote">Each app opens in a new tab. Once you're signed in here, you won't need to sign in again on any app you have access to.</div>
+  </div>
+</div>
+
+<script>
+const loginScreen = document.getElementById('login-screen');
+const hubScreen = document.getElementById('hub-screen');
+const loginForm = document.getElementById('login-form');
+const loginError = document.getElementById('login-error');
+const loginBtn = document.getElementById('login-btn');
+const usernameInput = document.getElementById('username');
+const passwordInput = document.getElementById('password');
+const welcomeMsg = document.getElementById('welcome-msg');
+const logoutBtn = document.getElementById('logout-btn');
+const loginBox = document.getElementById('login-box');
+const emptyNote = document.getElementById('empty-note');
+
+const tileGrid = document.getElementById('tile-grid');
+
+function esc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Apps come from the hub_apps table, managed in the Admin Portal → Apps.
+async function showHub(session) {
+  welcomeMsg.textContent = 'Signed in as ' + (session.displayName || session.username);
+  loginScreen.style.display = 'none';
+  hubScreen.style.display = 'flex';
+  const result = await DelcAuth.fetchApps(false);
+  const visibleApps = result.apps.filter(a => a.active !== false && DelcAuth.hasAppAccess(session, a.key));
+  let html = visibleApps.map(a => `
+      <a class="tile" data-app="${esc(a.key)}" href="${esc(a.url)}" target="_blank" rel="noopener">
+        <div class="tile-icon">${esc(a.icon || '📱')}</div>
+        <div class="tile-name">${esc(a.name)}</div>
+        <div class="tile-desc">${esc(a.description || '')}</div>
+        <div class="tile-go">Open App →</div>
+      </a>`).join('');
+  if (session.isAdmin) {
+    html += `
+      <a class="tile tile-admin" data-app="admin" href="./admin.html">
+        <div class="tile-icon">🛠️</div>
+        <div class="tile-name">Admin Portal</div>
+        <div class="tile-desc">Manage user accounts, which apps each person can access, and the apps shown on this hub.</div>
+        <div class="tile-go">Open Admin →</div>
+      </a>`;
+  }
+  tileGrid.innerHTML = html;
+  emptyNote.style.display = visibleApps.length ? 'none' : 'block';
+}
+
+function showLogin() {
+  hubScreen.style.display = 'none';
+  loginScreen.style.display = 'flex';
+  passwordInput.value = '';
+}
+
+// If already logged in (from this page or from any app / the admin portal), skip straight to the hub.
+const existing = DelcAuth.getSession();
+if (existing) {
+  // Re-check the account first so access changes an admin made since this
+  // person signed in (new apps granted, account removed) show up right away.
+  loginScreen.style.display = 'none';
+  DelcAuth.refreshSession().then(fresh => { if (fresh) showHub(fresh); else showLogin(); });
+} else {
+  showLogin();
+}
+
+loginForm.addEventListener('submit', async function (e) {
+  e.preventDefault();
+  loginError.style.display = 'none';
+  const u = usernameInput.value.trim();
+  const p = passwordInput.value;
+  if (!u || !p) {
+    loginError.textContent = 'Please enter your username and password.';
+    loginError.style.display = 'block';
+    return;
+  }
+  loginBtn.disabled = true;
+  loginBtn.textContent = 'Signing in…';
+  const result = await DelcAuth.login(u, p);
+  loginBtn.disabled = false;
+  loginBtn.textContent = 'Sign In';
+  if (!result.ok) {
+    loginError.textContent = result.error;
+    loginError.style.display = 'block';
+    loginBox.classList.add('shake');
+    setTimeout(() => loginBox.classList.remove('shake'), 400);
+    return;
+  }
+  showHub(result.session);
+});
+
+logoutBtn.addEventListener('click', function () {
+  DelcAuth.clearSession();
+  usernameInput.value = '';
+  showLogin();
+});
+</script>
+
+</body>
+</html>
