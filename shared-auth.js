@@ -12,12 +12,26 @@
   var SUPABASE_URL = 'https://ksdxhqyusaylfpyeecbv.supabase.co';
   var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtzZHhocXl1c2F5bGZweWVlY2J2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1NTE1NDgsImV4cCI6MjEwNDEyNzU0OH0.6HI0XWmlIfzyVy0iRH2GkAVNqYIZQwMeNhr4drTOUNo';
 
-  var APP_LABELS = {
-    fb: 'F&B Event Management',
-    mug: 'Motivational Mug POS',
-    pantry: 'HS Pantry System',
-    pet: 'Pet Pantry System'
-  };
+  // Built-in fallback list, used only if the hub_apps table can't be reached.
+  // The real list of apps is managed in the Admin Portal ("Apps" section)
+  // and stored in the hub_apps table.
+  var DEFAULT_APPS = [
+    { key: 'fb', name: 'F&B Event Management', icon: '🍽️', sort_order: 10, active: true,
+      url: 'https://delcdata.github.io/FBEventPotal/',
+      description: 'Plan and track food & beverage events, purchases, offerings, and volunteers.' },
+    { key: 'mug', name: 'Motivational Mug POS', icon: '☕', sort_order: 20, active: true,
+      url: 'https://delcdata.github.io/motivational-mug/',
+      description: 'Point-of-sale for the Motivational Mug coffee shop — menu, orders, and closeouts.' },
+    { key: 'pantry', name: 'HS Pantry System', icon: '🥫', sort_order: 30, active: true,
+      url: 'https://delcdata.github.io/HSPMugPantry/',
+      description: 'Manage food pantry inventory, receiving, dispensing, and stock counts.' },
+    { key: 'pet', name: 'Pet Pantry System', icon: '🐾', sort_order: 40, active: true,
+      url: 'https://delcdata.github.io/DELCPETPANTRY/',
+      description: 'Manage pet food & supply inventory, donations, and client distributions.' }
+  ];
+
+  var APP_LABELS = {};
+  DEFAULT_APPS.forEach(function (a) { APP_LABELS[a.key] = a.name; });
 
   function restHeaders() {
     return {
@@ -110,11 +124,48 @@
     return { ok: true, session: session };
   }
 
+  // Load the list of hub apps from the hub_apps table (sorted).
+  // includeInactive=true is used by the Admin Portal; the hub shows active only.
+  // Falls back to DEFAULT_APPS if the table can't be reached.
+  async function fetchApps(includeInactive) {
+    try {
+      var url = SUPABASE_URL + '/rest/v1/hub_apps?select=*&order=sort_order.asc,name.asc' +
+        (includeInactive ? '' : '&active=eq.true');
+      var res = await fetch(url, { headers: restHeaders() });
+      if (!res.ok) throw new Error('Apps lookup failed (' + res.status + ')');
+      var rows = await res.json();
+      rows.forEach(function (a) { APP_LABELS[a.key] = a.name; });
+      return { ok: true, apps: rows };
+    } catch (e) {
+      return { ok: false, apps: DEFAULT_APPS.slice(), error: e.message };
+    }
+  }
+
+  // Re-read the signed-in user's row so newly granted apps (or a removed
+  // account) take effect without logging out and back in.
+  async function refreshSession() {
+    var s = getSession();
+    if (!s) return null;
+    try {
+      var user = await fetchUserByUsername(s.username);
+      if (!user) { clearSession(); return null; }
+      s.displayName = user.display_name || user.username;
+      s.email = user.email;
+      s.isAdmin = !!user.is_admin;
+      s.allowedApps = Array.isArray(user.allowed_apps) ? user.allowed_apps : [];
+      setSession(s);
+    } catch (e) { /* offline: keep the cached session */ }
+    return s;
+  }
+
   global.DelcAuth = {
     SESSION_KEY: SESSION_KEY,
     SUPABASE_URL: SUPABASE_URL,
     SUPABASE_KEY: SUPABASE_KEY,
     APP_LABELS: APP_LABELS,
+    DEFAULT_APPS: DEFAULT_APPS,
+    fetchApps: fetchApps,
+    refreshSession: refreshSession,
     restHeaders: restHeaders,
     sha256Hex: sha256Hex,
     genSalt: genSalt,
