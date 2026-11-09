@@ -97,13 +97,24 @@
     return rows && rows.length ? rows[0] : null;
   }
 
+  // Fetch a user row by email (case-insensitive). Returns null if not found.
+  async function fetchUserByEmail(email) {
+    var url = SUPABASE_URL + '/rest/v1/hub_users?email=ilike.' +
+      encodeURIComponent(String(email || '').trim().replace(/[%_*]/g, '')) + '&select=*';
+    var res = await fetch(url, { headers: restHeaders() });
+    if (!res.ok) throw new Error('Lookup failed (' + res.status + ')');
+    var rows = await res.json();
+    return rows && rows.length ? rows[0] : null;
+  }
+
   // Attempt a login against hub_users. Returns {ok:true, session} or {ok:false, error}.
+  // The first box accepts either the username (ddetrich) or the email (ddetrich@mydelc.org).
   async function login(username, password) {
     username = (username || '').trim().toLowerCase();
-    if (!username) return { ok: false, error: 'Please enter your username.' };
+    if (!username) return { ok: false, error: 'Please enter your username or email.' };
     var user;
     try {
-      user = await fetchUserByUsername(username);
+      user = username.indexOf('@') !== -1 ? await fetchUserByEmail(username) : await fetchUserByUsername(username);
     } catch (e) {
       return { ok: false, error: 'Could not reach the login service. Try again.' };
     }
@@ -175,6 +186,7 @@
     clearSession: clearSession,
     hasAppAccess: hasAppAccess,
     fetchUserByUsername: fetchUserByUsername,
+    fetchUserByEmail: fetchUserByEmail,
     login: login
   };
 })(window);
