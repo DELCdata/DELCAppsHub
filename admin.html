@@ -13,14 +13,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DELC Admin Portal</title>
 <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+<script src="./delc-kit.js?v=4"></script>
 <script src="./shared-auth.js?v=4"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --navy:#1a3355;--navyD:#122440;--gold:#c9973a;--cream:#fdf8f2;
-  --sand:#f5ede0;--border:#e4d8c8;--muted:#7a6a55;--red:#b91c1c;--green:#1a6e3c;
+  --navy:#1B3254;--navyD:#14273F;--gold:#2F80ED;--cream:#f4f6fa;
+  --sand:#eef1f6;--border:#dbe1ea;--muted:#5d6a82;--red:#b91c1c;--green:#1a6e3c;
 }
-body{font-family:'Lato',sans-serif;background:var(--sand);color:#1a1a1a;min-height:100vh}
+body{font-family:var(--delc-body,'Lato',sans-serif);background:var(--sand);color:#1a1a1a;min-height:100vh}
 .btn{font-family:inherit;border-radius:8px;padding:9px 14px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:700;border:1px solid var(--border);background:#fff;color:#1a1a1a;transition:opacity .15s}
 .btn:hover{opacity:.85}
 .btn:disabled{opacity:.5;cursor:default}
@@ -35,7 +36,7 @@ body{font-family:'Lato',sans-serif;background:var(--sand);color:#1a1a1a;min-heig
 /* ── LOGIN / DENIED ── */
 #login-screen{min-height:100vh;background:linear-gradient(rgba(18,36,64,.88),rgba(18,36,64,.94)),url('https://storage1.snappages.site/GKKB9P/assets/images/22750931_1920x1080_500.png') center/cover no-repeat;display:flex;align-items:center;justify-content:center;padding:20px}
 .login-box{background:rgba(255,255,255,.97);border-radius:20px;padding:36px;box-shadow:0 24px 60px rgba(0,0,0,.4);width:100%;max-width:400px;text-align:center}
-.login-divider{height:3px;background:linear-gradient(90deg,var(--navy),var(--gold));border-radius:2px;width:60px;margin:0 auto 14px}
+.login-divider{display:flex;flex-direction:column;align-items:center;gap:10px;margin:0 auto 14px}.login-divider img{height:64px;width:auto}
 .login-title{font-size:21px;font-weight:900;color:var(--navy);letter-spacing:-.5px;margin-bottom:4px}
 .login-sub{font-size:12px;color:var(--muted);margin-bottom:24px}
 .login-error{background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:9px 12px;font-size:12px;color:var(--red);margin-bottom:14px;font-weight:700;display:none;text-align:left}
@@ -46,8 +47,9 @@ body{font-family:'Lato',sans-serif;background:var(--sand);color:#1a1a1a;min-heig
 /* ── ADMIN SCREEN ── */
 #admin-screen{display:none;min-height:100vh;flex-direction:column}
 .top-nav{background:var(--navy);padding:14px 20px;display:flex;align-items:center;gap:10px;min-height:54px;flex-wrap:wrap}
-.nav-title{flex:1;color:#fff;font-size:15px;font-weight:900;letter-spacing:-.3px}
+.nav-title{flex:1;color:#fff;font-size:15px;font-weight:900;letter-spacing:-.3px}.nav-title .delc-wm{font-size:20px}
 .nav-sub{font-size:11px;color:rgba(255,255,255,.5);margin-right:6px}
+@media(max-width:560px){.nav-sub{display:none}.card{overflow-x:auto}}
 .nav-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#fff;font-size:11px;padding:7px 12px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:700;text-decoration:none;display:inline-flex;align-items:center}
 .nav-btn:hover{background:rgba(255,255,255,.18)}
 .content{padding:22px 20px 60px;flex:1;max-width:960px;margin:0 auto;width:100%}
@@ -67,9 +69,10 @@ td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top}
 .row-actions .btn{padding:6px 10px;font-size:11px}
 .muted{color:var(--muted);font-size:12px}
 .empty-row td{text-align:center;color:var(--muted);padding:26px}
-.tabs{display:flex;gap:8px;margin-bottom:18px}
-.tab-btn{font-family:inherit;font-size:13px;font-weight:900;padding:9px 18px;border-radius:999px;border:1px solid var(--border);background:#fff;color:var(--navy);cursor:pointer}
-.tab-btn.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.tabs{display:flex;gap:4px;margin:0 0 18px;border-bottom:1px solid var(--border);overflow-x:auto}
+.tab-btn{font-family:inherit;font-size:14px;font-weight:700;padding:13px 14px 11px;border:0;border-bottom:3px solid transparent;background:none;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tab-btn:hover{color:var(--navy)}
+.tab-btn.active{color:var(--navy);border-bottom-color:var(--navy)}
 .grid-3{display:grid;grid-template-columns:90px 1fr 140px;gap:12px}
 .app-icon-cell{font-size:24px;width:44px;text-align:center}
 .app-url{font-size:11px;color:var(--muted);word-break:break-all;margin-top:2px}
@@ -86,7 +89,7 @@ tr.row-hidden td{opacity:.6}
 
 <div id="login-screen">
   <div class="login-box" id="login-box">
-    <div class="login-divider"></div>
+    <div class="login-divider" id="login-mark"></div>
     <div class="login-title">Admin Portal</div>
     <div class="login-sub">Sign in with an admin account</div>
     <div id="login-error" class="login-error"></div>
@@ -114,16 +117,16 @@ tr.row-hidden td{opacity:.6}
 
 <div id="admin-screen">
   <div class="top-nav">
-    <div class="nav-title">DELC Admin Portal</div>
+    <div class="nav-title"><span class="delc-wm">delc<b>ADMIN</b></span></div>
     <span class="nav-sub" id="welcome-msg"></span>
-    <a class="nav-btn" href="./index.html">← Hub</a>
-    <button class="nav-btn" id="logout-btn">Log Out</button>
+    <a class="nav-btn delc-hbtn" href="./index.html">Apps</a>
+    <button class="nav-btn delc-hbtn" id="logout-btn">Sign out</button>
   </div>
   <div class="content">
 
     <div class="tabs">
-      <button type="button" class="tab-btn active" data-tab="users">👥 Users</button>
-      <button type="button" class="tab-btn" data-tab="apps">📱 Hub Apps</button>
+      <button type="button" class="tab-btn active" data-tab="users">Users</button>
+      <button type="button" class="tab-btn" data-tab="apps">Hub Apps</button>
     </div>
 
     <div id="tab-users">
@@ -134,13 +137,15 @@ tr.row-hidden td{opacity:.6}
         <div class="grid-2">
           <div class="field">
             <label class="lbl">Full name</label>
-            <input class="inp" id="f-display-name" placeholder="Derek Detrich">
+            <input class="inp" id="f-display-name" placeholder="Start typing a name from delcPEOPLE" list="ppl-names" autocomplete="off">
           </div>
           <div class="field">
             <label class="lbl">Email</label>
             <input class="inp" id="f-email" type="email" placeholder="name@mydelc.org">
           </div>
         </div>
+        <div id="ppl-hint" class="muted" style="margin:-4px 0 10px"></div>
+        <datalist id="ppl-names"></datalist>
         <div class="grid-2">
           <div class="field">
             <label class="lbl">Username</label>
@@ -250,6 +255,7 @@ tr.row-hidden td{opacity:.6}
 </div>
 
 <script>
+(function(){const m=document.getElementById("login-mark");if(m&&window.DELC)m.innerHTML=DELC.logoImg()+'<span class="delc-wm pill">delc<b>ADMIN</b></span>';})();
 let hubApps = [];   // loaded from hub_apps (includes hidden apps)
 let lastUsers = [];
 
@@ -293,6 +299,7 @@ function showScreen(name) {
 
 function resetForm() {
   userForm.reset();
+  const ph = document.getElementById('ppl-hint'); if (ph) ph.textContent = '';
   editIdInput.value = '';
   formTitle.textContent = 'Add User';
   pwHint.textContent = '(required for a new user)';
@@ -335,9 +342,10 @@ async function renderUsers() {
     return;
   }
   lastUsers = users;
+  await pplLoad();
   userRows.innerHTML = users.map(u => `
     <tr>
-      <td>${esc(u.display_name || '—')}</td>
+      <td>${esc(u.display_name || '—')}${PPLA.length && !pplFor(u) ? '<div><span class="badge badge-hidden" title="No delcPEOPLE record has this username. Edit and save to link them.">Not linked to delcPEOPLE</span></div>' : ''}</td>
       <td>${esc(u.username)}</td>
       <td>${esc(u.email || '—')}</td>
       <td>${appBadges(u)}</td>
@@ -370,6 +378,7 @@ function startEdit(id, users) {
   fIsAdmin.checked = !!u.is_admin;
   appCbs().forEach(cb => { cb.checked = (u.allowed_apps || []).includes(cb.value); });
   formTitle.textContent = 'Edit User';
+  pplHint();
   saveBtn.textContent = 'Save Changes';
   cancelEditBtn.style.display = 'inline-flex';
   formError.style.display = 'none';
@@ -460,6 +469,7 @@ userForm.addEventListener('submit', async function (e) {
       throw new Error(text.indexOf('duplicate') !== -1 ? 'That username is already taken.' : 'Save failed.');
     }
 
+    await pplLink(username, email, displayName);
     resetForm();
     renderUsers();
   } catch (err) {
@@ -470,6 +480,60 @@ userForm.addEventListener('submit', async function (e) {
     saveBtn.textContent = isEdit ? 'Save Changes' : 'Save User';
   }
 });
+
+
+// ── Logins are people in delcPEOPLE (2026-11-14): pick the person, and saving writes the username to their delcPEOPLE record ──
+let PPLA = [];
+const pNorm = v => String(v || '').toLowerCase().replace(/\s+/g, ' ').trim();
+async function pplLoad() {
+  try {
+    const sel = 'id,first:data->>first,last:data->>last,email:data->>email,hub:data->>hub,active:data->>active';
+    const r = await fetch(DelcAuth.SUPABASE_URL + '/rest/v1/people_records?kind=eq.people&select=' + sel, { headers: DelcAuth.restHeaders() });
+    if (!r.ok) throw new Error('people ' + r.status);
+    PPLA = (await r.json()).map(p => Object.assign(p, { name: [p.first, p.last].filter(Boolean).join(' ').trim() })).filter(p => p.name).sort((a, b) => a.name.localeCompare(b.name));
+  } catch (e) { console.warn('delcPEOPLE list', e); PPLA = []; }
+  const dl = document.getElementById('ppl-names');
+  if (dl) dl.innerHTML = PPLA.filter(p => p.active !== 'false').map(p => '<option value="' + esc(p.name) + '"></option>').join('');
+  return PPLA;
+}
+function pplFor(u) {
+  const un = pNorm(u.username), em = pNorm(u.email), nm = pNorm(u.display_name);
+  return PPLA.find(p => pNorm(p.hub) === un) || null;
+}
+function pplPick(name, email) {
+  const nm = pNorm(name), em = pNorm(email);
+  return PPLA.find(p => pNorm(p.name) === nm) || (em ? PPLA.find(p => pNorm(p.email) === em) : null) || null;
+}
+const suggestUser = n => { const w = pNorm(n).replace(/[^a-z\s]/g, '').split(' ').filter(Boolean); return w.length > 1 ? w[0][0] + w[w.length - 1] : (w[0] || ''); };
+function pplHint(fromTyping) {
+  const h = document.getElementById('ppl-hint'); if (!h) return;
+  if (!PPLA.length) { h.textContent = ''; return; }
+  const p = pplPick(fDisplayName.value, fEmail.value), un = slugUsername(fUsername.value);
+  if (p && fromTyping && !editIdInput.value) {
+    if (!fEmail.value && p.email) fEmail.value = p.email;
+    if (!fUsername.value) fUsername.value = p.hub || suggestUser(p.name);
+  }
+  const u2 = slugUsername(fUsername.value);
+  if (!p) { h.textContent = fDisplayName.value.trim() ? 'Not in delcPEOPLE — add them there too so their name, phone and roles stay in one place.' : 'Pick the person from delcPEOPLE — their email and a username fill in.'; return; }
+  if (!p.hub) h.innerHTML = '✓ <b>' + esc(p.name) + '</b> is in delcPEOPLE — saving adds the username <b>' + esc(u2 || '…') + '</b> to their record.';
+  else if (pNorm(p.hub) !== pNorm(u2)) h.innerHTML = '✓ <b>' + esc(p.name) + '</b> is in delcPEOPLE as <b>' + esc(p.hub) + '</b> — saving changes it to <b>' + esc(u2 || '…') + '</b> so the apps match.';
+  else h.innerHTML = '✓ Linked to <b>' + esc(p.name) + '</b> in delcPEOPLE.';
+}
+async function pplLink(username, email, name) {
+  const p = pplPick(name, email); if (!p || pNorm(p.hub) === pNorm(username)) return;
+  try {
+    const r = await fetch(DelcAuth.SUPABASE_URL + '/rest/v1/people_records?id=eq.' + encodeURIComponent(p.id) + '&select=data', { headers: DelcAuth.restHeaders() });
+    const rows = r.ok ? await r.json() : []; if (!rows[0]) return;
+    const data = Object.assign({}, rows[0].data, { hub: username });
+    if (!data.email && email) data.email = email;
+    await fetch(DelcAuth.SUPABASE_URL + '/rest/v1/people_records?id=eq.' + encodeURIComponent(p.id), {
+      method: 'PATCH', headers: Object.assign({ Prefer: 'return=minimal' }, DelcAuth.restHeaders()),
+      body: JSON.stringify({ data, updated_at: new Date().toISOString(), updated_by: 'DELC Apps Admin' })
+    });
+  } catch (e) { console.warn('link delcPEOPLE', e); }
+}
+['input', 'change'].forEach(ev => fDisplayName.addEventListener(ev, () => pplHint(true)));
+fUsername.addEventListener('input', () => pplHint(false));
 
 // ── Hub Apps ──
 const appForm = document.getElementById('app-form');
