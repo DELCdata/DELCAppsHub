@@ -16,16 +16,16 @@
   // The real list of apps is managed in the Admin Portal ("Apps" section)
   // and stored in the hub_apps table.
   var DEFAULT_APPS = [
-    { key: 'fb', name: 'F&B Event Management', icon: '🍽️', sort_order: 10, active: true,
+    { key: 'fb', name: 'delcEVENTS', icon: '🍽️', sort_order: 10, active: true,
       url: 'https://delcdata.github.io/FBEventPotal/',
       description: 'Plan and track food & beverage events, purchases, offerings, and volunteers.' },
     { key: 'mug', name: 'Motivational Mug POS', icon: '☕', sort_order: 20, active: true,
       url: 'https://delcdata.github.io/motivational-mug/',
       description: 'Point-of-sale for the Motivational Mug coffee shop — menu, orders, and closeouts.' },
-    { key: 'pantry', name: 'HS Pantry System', icon: '🥫', sort_order: 30, active: true,
+    { key: 'pantry', name: 'delcPANTRY', icon: '🥫', sort_order: 30, active: true,
       url: 'https://delcdata.github.io/HSPMugPantry/',
       description: 'Manage food pantry inventory, receiving, dispensing, and stock counts.' },
-    { key: 'pet', name: 'Pet Pantry System', icon: '🐾', sort_order: 40, active: true,
+    { key: 'pet', name: 'delcPETPANTRY', icon: '🐾', sort_order: 40, active: true,
       url: 'https://delcdata.github.io/DELCPETPANTRY/',
       description: 'Manage pet food & supply inventory, donations, and client distributions.' }
   ];
@@ -168,6 +168,32 @@
     } catch (e) { /* offline: keep the cached session */ }
     return s;
   }
+
+  // "Who changed it" (2026-11-14): every write to the database from any delcAPP carries the signed-in
+  // hub username inside the x-client-info header (already allowed by the database's CORS rules).
+  // A database trigger copies it into the row's updated_by column. Reads are untouched.
+  (function stampWrites() {
+    if (global.__delcStamp || typeof global.fetch !== 'function') return;
+    global.__delcStamp = true;
+    var orig = global.fetch;
+    global.fetch = function (input, init) {
+      try {
+        var url = typeof input === 'string' ? input : (input && input.url) || '';
+        var method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+        if (method !== 'GET' && method !== 'HEAD' && url.indexOf(SUPABASE_URL + '/rest/v1/') === 0) {
+          var s = getSession(), u = s && String(s.username || '').replace(/[^A-Za-z0-9._-]/g, '');
+          if (u) {
+            init = Object.assign({}, init || {});
+            var h = new Headers(init.headers || (input && input.headers) || {});
+            var ci = h.get('x-client-info') || 'delc-apps';
+            if (ci.indexOf('delc-user=') < 0) h.set('x-client-info', ci + ' delc-user=' + u);
+            init.headers = h;
+          }
+        }
+      } catch (e) { /* never block a save over this */ }
+      return orig.call(this, input, init);
+    };
+  })();
 
   global.DelcAuth = {
     SESSION_KEY: SESSION_KEY,
