@@ -175,7 +175,7 @@
   (function stampWrites() {
     if (global.__delcStamp || typeof global.fetch !== 'function') return;
     global.__delcStamp = true;
-    var orig = global.fetch;
+    var orig = global.fetch; global.__delcOrigFetch = orig;
     global.fetch = function (input, init) {
       try {
         var url = typeof input === 'string' ? input : (input && input.url) || '';
@@ -193,6 +193,53 @@
       } catch (e) { /* never block a save over this */ }
       return orig.call(this, input, init);
     };
+  })();
+
+  // "Last changed by …" (2026-11-14): an app puts <span class="delc-changed" data-t="<table>" data-id="<row id>"></span>
+  // where it wants the line; this fills it from the row's updated_by / updated_at (recorded by the database on every save).
+  (function lastChanged() {
+    if (global.__delcChanged || typeof document === 'undefined' || typeof MutationObserver === 'undefined') return;
+    global.__delcChanged = true;
+    var names = null, namesAt = 0, cache = {};
+    function hdr() { return {apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY}; }
+    function loadNames() {
+      if (names && Date.now() - namesAt < 600000) return Promise.resolve(names);
+      if (loadNames.p) return loadNames.p;
+      return loadNames.p = orig(SUPABASE_URL + '/rest/v1/hub_users?select=username,display_name', {headers: hdr()}).then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (L) { names = {}; (L || []).forEach(function (u) { names[String(u.username).toLowerCase()] = u.display_name || u.username; }); namesAt = Date.now(); return names; })
+        .catch(function () { names = names || {}; return names; }).then(function (N) { loadNames.p = null; return N; });
+    }
+    var orig = function (u, o) { return (global.__delcOrigFetch || global.fetch)(u, o); };
+    function when(ts) { var d = new Date(ts); if (isNaN(d)) return ''; var now = new Date(), same = d.toDateString() === now.toDateString();
+      var t = d.toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'});
+      return same ? 'today at ' + t : d.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric'}) + ' at ' + t; }
+    function who(by, N) { if (!by) return ''; var k = String(by).toLowerCase(); if (N[k]) return N[k];
+      if (/^delc|apps admin|public form|daily/i.test(by)) return 'through ' + by;   // sync between apps, the admin page, public forms
+      return by; }
+    function fill(el) {
+      var t = el.getAttribute('data-t'), id = el.getAttribute('data-id'); if (!t || !id || !/^[a-z_]+$/.test(t)) return;
+      el.setAttribute('data-done', '1');
+      var key = t + '|' + id, c;
+      // data-also="table:column" also looks at related rows (e.g. a meeting's agenda items) and shows the newest change
+      var also = (el.getAttribute('data-also') || '').split(',').map(function (x) { return x.trim().split(':'); }).filter(function (a) { return a.length === 2 && /^[a-z_]+$/.test(a[0]) && /^[a-z_]+$/.test(a[1]); });
+      key += '|' + (el.getAttribute('data-also') || ''); c = cache[key];
+      var get = function (url) { return orig(url, {headers: hdr()}).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }); };
+      var p = c && Date.now() - c.at < 5000 ? Promise.resolve(c.row) : Promise.all([get(SUPABASE_URL + '/rest/v1/' + t + '?select=updated_by,updated_at&id=eq.' + encodeURIComponent(id))].concat(also.map(function (a) {
+          return get(SUPABASE_URL + '/rest/v1/' + a[0] + '?select=updated_by,updated_at&' + a[1] + '=eq.' + encodeURIComponent(id) + '&order=updated_at.desc.nullslast&limit=1'); })))
+        .then(function (R) { var row = null; R.forEach(function (L) { var x = L && L[0]; if (x && x.updated_at && (!row || new Date(x.updated_at) > new Date(row.updated_at))) row = x; }); cache[key] = {at: Date.now(), row: row}; return row; });
+      Promise.all([p, loadNames()]).then(function (a) {
+        var row = a[0], N = a[1]; if (!row || !row.updated_at) { el.textContent = ''; return; }
+        var w = who(row.updated_by, N);
+        el.textContent = 'Last changed ' + (w ? (/^through /.test(w) ? w + ' ' : 'by ' + w + ' ') : '') + when(row.updated_at);
+        el.title = row.updated_by ? 'Saved by ' + row.updated_by : '';
+      }).catch(function () {});
+    }
+    function scan(root) { var L = (root || document).querySelectorAll ? (root || document).querySelectorAll('.delc-changed[data-t][data-id]:not([data-done])') : []; for (var i = 0; i < L.length; i++) fill(L[i]); }
+    function start() {
+      var st = document.createElement('style'); st.textContent = '.delc-changed{display:block;font-size:12px;color:#5d6a82;margin-top:4px}.delc-changed:empty{display:none}@media print{.delc-changed{display:none}}'; document.head.appendChild(st);
+      scan(document); new MutationObserver(function () { scan(document); }).observe(document.body, {childList: true, subtree: true});
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
   })();
 
   global.DelcAuth = {
