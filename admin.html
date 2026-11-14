@@ -127,6 +127,7 @@ tr.row-hidden td{opacity:.6}
     <div class="tabs">
       <button type="button" class="tab-btn active" data-tab="users">Users</button>
       <button type="button" class="tab-btn" data-tab="apps">Hub Apps</button>
+      <button type="button" class="tab-btn" data-tab="backups">Backups</button>
     </div>
 
     <div id="tab-users">
@@ -250,6 +251,32 @@ tr.row-hidden td{opacity:.6}
       </table>
     </div>
     </div><!-- /tab-apps -->
+
+    <!-- Backups (2026-11-14): restore records from the nightly copy -->
+    <div id="tab-backups" style="display:none">
+      <div class="card" id="bk-lock">
+        <div class="card-title">Restore from a backup</div>
+        <p class="muted" style="margin:0 0 12px;font-size:13px">Every night at about 2:15 AM every app's data is copied, and the last 30 days are kept. Use this to bring back something that was deleted or changed by mistake. For safety, type your password again to open the backups.</p>
+        <form id="bk-unlock" class="row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input class="inp" type="password" id="bk-pw" placeholder="Your password" autocomplete="current-password" style="max-width:260px"><button class="btn btn-primary" type="submit">Open backups</button><span id="bk-lockmsg" class="muted" style="font-size:13px"></span></form>
+      </div>
+      <div id="bk-main" style="display:none">
+        <div class="card">
+          <div class="card-title">1 · Pick a night and what to look at</div>
+          <div class="grid-2">
+            <div class="field"><label class="lbl">Night</label><select class="inp" id="bk-night"></select></div>
+            <div class="field"><label class="lbl">App data</label><select class="inp" id="bk-table"><option value="">Pick one…</option></select></div>
+          </div>
+          <div class="muted" style="font-size:12.5px">“Safety copy” nights are the copies made just before someone restored something — pick one to undo a restore.</div>
+        </div>
+        <div class="card" id="bk-rows-card" style="display:none">
+          <div class="card-title" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>2 · Choose what to put back</span><span style="flex:1"></span><label style="font-size:12.5px;font-weight:600;display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bk-diff" checked style="width:auto"> Only show what’s different now</label></div>
+          <input class="inp" id="bk-q" placeholder="Search these records" style="margin-bottom:10px">
+          <div id="bk-summary" class="muted" style="font-size:13px;margin-bottom:8px"></div>
+          <div id="bk-rows" style="max-height:460px;overflow:auto;border:1px solid var(--border);border-radius:10px"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center"><button class="btn btn-primary" id="bk-go" disabled>Restore checked</button><span id="bk-confirm" style="font-size:13px"></span></div>
+        </div>
+      </div>
+    </div><!-- /tab-backups -->
 
   </div>
 </div>
@@ -775,8 +802,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const tab = btn.getAttribute('data-tab');
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
-    document.getElementById('tab-users').style.display = tab === 'users' ? 'block' : 'none';
-    document.getElementById('tab-apps').style.display = tab === 'apps' ? 'block' : 'none';
+    ['users', 'apps', 'backups'].forEach(t => { const el = document.getElementById('tab-' + t); if (el) el.style.display = tab === t ? 'block' : 'none'; });
     try { sessionStorage.setItem('delc_admin_tab', tab); } catch (e) {}
   });
 });
@@ -784,6 +810,93 @@ try {
   const savedTab = sessionStorage.getItem('delc_admin_tab');
   if (savedTab) { const b = document.querySelector('.tab-btn[data-tab="' + savedTab + '"]'); if (b) b.click(); }
 } catch (e) {}
+
+
+// ── Backups: restore from the nightly copy (2026-11-14). Every request re-checks the admin's password hash in the database. ──
+const BK = {user: '', hash: '', nights: [], table: null, picked: new Set()};
+const APPN = [['board_', 'delcBOARD'], ['fac_', 'delcFACILITIES'], ['events', 'delcEVENTS'], ['fb_', 'delcEVENTS'], ['pantry_', 'delcPANTRY'], ['pet_', 'delcPETPANTRY'], ['att_', 'delcATTENDANCE'], ['people_', 'delcPEOPLE'], ['edu_', 'delcEDUCATION'], ['seat_', 'delcDINING.EVENT'], ['mug_', 'Motivational Mug'], ['hub_', 'DELC Apps Hub'], ['backups', 'Old backups']];
+const appOf = t => (APPN.find(([p]) => t.startsWith(p)) || [, 'Other'])[1];
+const nice = t => t.replace(/^(board|fac|fb|pantry|pet|att|people|edu|seat|mug|hub)_/, '').replace(/_/g, ' ');
+const bkWhen = ts => new Date(ts).toLocaleString('en-US', {weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'});
+async function bkRpc(fn, body) {
+  const r = await fetch(DelcAuth.SUPABASE_URL + '/rest/v1/rpc/' + fn, {method: 'POST', headers: DelcAuth.restHeaders(), body: JSON.stringify(Object.assign({p_user: BK.user, p_hash: BK.hash}, body || {}))});
+  const t = await r.text(); let j; try { j = JSON.parse(t); } catch (e) { j = t; }
+  if (!r.ok) throw new Error(j && j.message === 'not_allowed' ? 'That password didn’t work, or this account isn’t an admin.' : (j && j.message) || ('Error ' + r.status));
+  return j;
+}
+document.getElementById('bk-unlock').addEventListener('submit', async e => {
+  e.preventDefault(); const msg = document.getElementById('bk-lockmsg'); msg.textContent = 'Checking…';
+  try {
+    const sess = DelcAuth.getSession(); BK.user = sess && sess.username;
+    const r = await fetch(DelcAuth.SUPABASE_URL + '/rest/v1/hub_users?select=salt&username=eq.' + encodeURIComponent(BK.user), {headers: DelcAuth.restHeaders()});
+    const u = (await r.json())[0]; if (!u) throw new Error('Account not found');
+    BK.hash = await DelcAuth.hashPassword(document.getElementById('bk-pw').value, u.salt);
+    BK.nights = await bkRpc('backup_admin_list');
+    document.getElementById('bk-pw').value = ''; msg.textContent = '';
+    document.getElementById('bk-lock').style.display = 'none'; document.getElementById('bk-main').style.display = 'block';
+    document.getElementById('bk-night').innerHTML = BK.nights.map((n, i) => `<option value="${esc(n.taken_at)}">${esc(bkWhen(n.taken_at))}${n.note ? ' — safety copy (' + esc(n.note.replace(/^Before a restore by /, 'before a restore by ')) + ')' : i === 0 ? ' — newest' : ''} · ${n.tables} table${n.tables === 1 ? '' : 's'}</option>`).join('');
+    bkNight();
+  } catch (err) { msg.textContent = err.message; BK.hash = ''; }
+});
+async function bkNight() {
+  const t = document.getElementById('bk-night').value; document.getElementById('bk-rows-card').style.display = 'none';
+  const j = await bkRpc('backup_admin_table', {p_taken: t, p_tbl: ''});
+  const groups = {}; (j.tables || []).forEach(x => (groups[appOf(x.tbl)] = groups[appOf(x.tbl)] || []).push(x));
+  document.getElementById('bk-table').innerHTML = '<option value="">Pick one…</option>' + Object.keys(groups).sort().map(g => `<optgroup label="${esc(g)}">${groups[g].map(x => `<option value="${esc(x.tbl)}">${esc(nice(x.tbl))} (${x.rows})</option>`).join('')}</optgroup>`).join('');
+}
+const strip = r => { const o = {}; Object.keys(r || {}).sort().forEach(k => { if (k !== 'updated_at' && k !== 'updated_by') o[k] = r[k]; }); return JSON.stringify(o); };
+function rowLabel(r) {
+  const d = r.data && typeof r.data === 'object' ? r.data : {};
+  const name = r.name || r.title || r.display_name || r.username || (d.first || d.last ? [d.first, d.last].filter(Boolean).join(' ') : '') || d.name || d.title || r.text || r.subject || '';
+  const extra = [r.num != null ? '#' + r.num : '', r.kind || '', r.date || r.meeting_date || r.event_date || r.day || '', r.status || ''].filter(Boolean).join(' · ');
+  return (name ? esc(String(name).slice(0, 80)) : `<span class="muted">${esc(String(r.id || r.key || '').slice(0, 40))}</span>`) + (extra ? ` <span class="muted" style="font-size:12px">· ${esc(extra)}</span>` : '');
+}
+async function bkTable() {
+  const tbl = document.getElementById('bk-table').value; const card = document.getElementById('bk-rows-card'); BK.picked.clear(); document.getElementById('bk-confirm').textContent = '';
+  if (!tbl) { card.style.display = 'none'; return; }
+  document.getElementById('bk-rows').innerHTML = '<div class="muted" style="padding:12px">Loading…</div>'; card.style.display = 'block';
+  const j = await bkRpc('backup_admin_table', {p_taken: document.getElementById('bk-night').value, p_tbl: tbl});
+  const pk = j.pk || 'id', live = new Map((j.live || []).map(r => [String(r[pk]), r]));
+  const keys = new Set((j.snapshot || []).map(r => String(r[pk])));
+  BK.table = {tbl, pk, rows: (j.snapshot || []).map(r => { const now = live.get(String(r[pk])); return {k: String(r[pk]), saved: r, now, state: !now ? 'deleted' : strip(now) === strip(r) ? 'same' : 'changed'}; }), added: (j.live || []).filter(r => !keys.has(String(r[pk]))).length};
+  bkRender();
+}
+function bkDiff(a, b) {
+  const ks = [...new Set([...Object.keys(a || {}), ...Object.keys(b || {})])].filter(k => k !== 'updated_at' && k !== 'updated_by' && JSON.stringify((a || {})[k]) !== JSON.stringify((b || {})[k]));
+  const v = x => { const s2 = typeof x === 'string' ? x : JSON.stringify(x); return esc(s2 == null ? '—' : s2.length > 160 ? s2.slice(0, 160) + '…' : s2); };
+  return ks.slice(0, 12).map(k => `<div style="font-size:12px;margin:3px 0"><b>${esc(k)}</b>: <span style="color:#17703d">saved</span> ${v((a || {})[k])} <span style="color:#b91c1c">→ now</span> ${v((b || {})[k])}</div>`).join('') + (ks.length > 12 ? `<div class="muted" style="font-size:12px">…and ${ks.length - 12} more</div>` : '');
+}
+function bkRender() {
+  const T = BK.table; if (!T) return; const q = document.getElementById('bk-q').value.toLowerCase(), onlyDiff = document.getElementById('bk-diff').checked;
+  const L = T.rows.filter(r => (!onlyDiff || r.state !== 'same') && (!q || JSON.stringify(r.saved).toLowerCase().includes(q)));
+  const n = s2 => T.rows.filter(r => r.state === s2).length;
+  document.getElementById('bk-summary').innerHTML = `${n('deleted')} deleted since · ${n('changed')} changed since · ${n('same')} the same${T.added ? ` · ${T.added} added since (restoring never removes these)` : ''}`;
+  const chip = s2 => s2 === 'deleted' ? '<span class="badge" style="background:#fdecec;color:#b91c1c">Deleted since</span>' : s2 === 'changed' ? '<span class="badge" style="background:#fff4e5;color:#9a4a00">Changed since</span>' : '<span class="badge" style="background:#eef1f6;color:#5d6a82">Same</span>';
+  document.getElementById('bk-rows').innerHTML = L.length ? L.map(r => `<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border-bottom:1px solid var(--border)">
+      <input type="checkbox" data-bk="${esc(r.k)}" ${BK.picked.has(r.k) ? 'checked' : ''} ${r.state === 'same' ? 'disabled' : ''} style="width:auto;margin-top:3px">
+      <div style="flex:1;min-width:0"><div>${rowLabel(r.saved)} ${chip(r.state)}</div>${r.state === 'changed' ? `<details style="margin-top:4px"><summary class="muted" style="font-size:12px;cursor:pointer">What’s different</summary>${bkDiff(r.saved, r.now)}</details>` : ''}</div></div>`).join('')
+    : `<div class="muted" style="padding:12px">${onlyDiff ? 'Nothing in this table is different from that night.' : 'No records.'}</div>`;
+  document.getElementById('bk-go').disabled = !BK.picked.size; document.getElementById('bk-go').textContent = BK.picked.size ? `Restore ${BK.picked.size} checked` : 'Restore checked';
+}
+document.getElementById('bk-night').addEventListener('change', () => { bkNight().catch(e => alert(e.message)); });
+document.getElementById('bk-table').addEventListener('change', () => { bkTable().catch(e => { document.getElementById('bk-rows').innerHTML = `<div style="padding:12px;color:#b91c1c">${esc(e.message)}</div>`; }); });
+document.getElementById('bk-q').addEventListener('input', bkRender);
+document.getElementById('bk-diff').addEventListener('change', bkRender);
+document.getElementById('bk-rows').addEventListener('change', e => { const k = e.target.dataset && e.target.dataset.bk; if (k == null) return; e.target.checked ? BK.picked.add(k) : BK.picked.delete(k); document.getElementById('bk-confirm').textContent = ''; bkRender(); });
+document.getElementById('bk-go').addEventListener('click', () => {
+  const c = document.getElementById('bk-confirm'), n = BK.picked.size, night = bkWhen(document.getElementById('bk-night').value);
+  c.innerHTML = `Put ${n} record${n === 1 ? '' : 's'} in <b>${esc(nice(BK.table.tbl))}</b> back the way ${n === 1 ? 'it was' : 'they were'} on ${esc(night)}? A copy of the table as it is now is kept first. <button class="btn btn-primary" id="bk-yes" style="margin-left:6px">Yes, restore</button> <button class="btn" id="bk-no">Cancel</button>`;
+  document.getElementById('bk-no').onclick = () => { c.textContent = ''; };
+  document.getElementById('bk-yes').onclick = async () => {
+    c.textContent = 'Restoring…';
+    try { const r = await bkRpc('backup_admin_restore', {p_taken: document.getElementById('bk-night').value, p_tbl: BK.table.tbl, p_keys: [...BK.picked]});
+      BK.nights = await bkRpc('backup_admin_list'); const keepNight = document.getElementById('bk-night').value;
+      document.getElementById('bk-night').innerHTML = BK.nights.map((x, i) => `<option value="${esc(x.taken_at)}">${esc(bkWhen(x.taken_at))}${x.note ? ' — safety copy (' + esc(x.note.replace(/^Before a restore by /, 'before a restore by ')) + ')' : i === 0 ? ' — newest' : ''} · ${x.tables} table${x.tables === 1 ? '' : 's'}</option>`).join('');
+      document.getElementById('bk-night').value = keepNight;
+      await bkTable(); document.getElementById('bk-confirm').innerHTML = `<span style="color:#17703d;font-weight:700">✓ Restored ${r.restored} record${r.restored === 1 ? '' : 's'}.</span> To undo, pick the “safety copy” night at the top of the list.`;
+    } catch (err) { c.innerHTML = `<span style="color:#b91c1c">${esc(err.message)}</span>`; }
+  };
+});
 
 // ── Login gate ──
 function enterAdmin(session) {
