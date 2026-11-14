@@ -20,7 +20,13 @@
     '.delc-lh .lh-title{font-size:17pt;font-weight:800;color:#1B3254;line-height:1.15;margin:1px 0 0}' +
     '.delc-lh .lh-sub{font-size:10.5pt;color:#333;margin-top:3px}' +
     '.delc-lh .lh-right{margin-left:auto;text-align:right;font-size:9.5pt;color:#555;line-height:1.5;flex-shrink:0}' +
-    '.delc-lf{margin-top:18px;padding-top:8px;border-top:1px solid #d9dee7;font-size:8pt;color:#666;display:flex;justify-content:space-between;gap:12px;font-family:"Figtree","Segoe UI",Helvetica,Arial,sans-serif}';
+    '.delc-lf{margin-top:18px;padding-top:8px;border-top:1px solid #d9dee7;font-size:8pt;color:#666;display:flex;justify-content:space-between;gap:12px;font-family:"Figtree","Segoe UI",Helvetica,Arial,sans-serif}' +
+    /* DELC.pageWrap(): the letterhead sits in a table header and the footer in a table footer, which browsers repeat on every printed page */
+    'table.delc-pg{width:100%;border-collapse:collapse;border:0;margin:0}' +
+    'table.delc-pg>thead>tr>td,table.delc-pg>tfoot>tr>td,table.delc-pg>tbody>tr>td{border:0!important;padding:0!important;background:none!important;vertical-align:top}' +
+    'table.delc-pg>tbody>tr{break-inside:auto!important;page-break-inside:auto!important}' +
+    'table.delc-pg>thead{display:table-header-group}table.delc-pg>tfoot{display:table-footer-group}' +
+    'table.delc-pg>tfoot .delc-lf{margin-top:10px}';
 
   var CSS =
     ':root{--delc-navy:#1B3254;--delc-navy2:#26446f;--delc-navy-d:#14273F;--delc-soft:#e6ecf5;--delc-focus:#2F80ED;--delc-accent:#B83280;--delc-green:#84c225;' +
@@ -66,7 +72,7 @@
   if (!document.querySelector('meta[name="theme-color"]')) add('meta', {name: 'theme-color', content: '#1B3254'});
 
   window.DELC = {
-    version: 4, church: CHURCH, hubUrl: HUB, logo: LOGO, logoSquare: LOGO_SQ, printCss: PRINT_CSS, esc: esc,
+    version: 5, church: CHURCH, hubUrl: HUB, logo: LOGO, logoSquare: LOGO_SQ, printCss: PRINT_CSS, esc: esc,
     colors: {navy: '#1B3254', navy2: '#26446f', navyDark: '#14273F', soft: '#e6ecf5', focus: '#2F80ED', accent: '#B83280', green: '#84c225'},
     /* delcBOARD-style name: DELC.wordmark('EVENTS') on navy, DELC.wordmark('EVENTS', true) as a navy pill on a light card */
     wordmark: function (suffix, pill) { return '<span class="delc-wm' + (pill ? ' pill' : '') + '">delc<b>' + esc(suffix) + '</b></span>'; },
@@ -80,6 +86,26 @@
         (o.sub ? '<div class="lh-sub">' + esc(o.sub) + '</div>' : '') + '</div>' + (o.right ? '<div class="lh-right">' + o.right + '</div>' : '') + '</div>'; },
     /* bottom of every printed page: app name on the left, print date on the right */
     footer: function (appName, extra) { var d = new Date().toLocaleDateString('en-US', {month: 'long', day: 'numeric', year: 'numeric'});
-      return '<div class="delc-lf"><span>' + esc(CHURCH) + ' · ' + esc(appName || 'delcAPPS') + (extra ? ' · ' + esc(extra) : '') + '</span><span>Printed ' + esc(d) + '</span></div>'; }
+      return '<div class="delc-lf"><span>' + esc(CHURCH) + ' · ' + esc(appName || 'delcAPPS') + (extra ? ' · ' + esc(extra) : '') + '</span><span>Printed ' + esc(d) + '</span></div>'; },
+    /* wrap a printed document so the letterhead (head) and footer (foot) repeat on every page. All three are HTML. */
+    /* rearrange an already-written printout so its letterhead (.delc-lh) and last footer (.delc-lf) repeat on every page.
+       target: a pop-up's document, or the element that holds an in-page printout. Safe to call twice; does nothing without a letterhead. */
+    repeatPages: function (target) {
+      try {
+        var doc = target && target.nodeType === 9 ? target : (target ? target.ownerDocument : document), root = target && target.nodeType === 9 ? target.body : (target || document.body);
+        if (!root || root.querySelector('table.delc-pg')) return;
+        var lh = root.querySelector('.delc-lh'); if (!lh) return;
+        var lfs = root.querySelectorAll('.delc-lf'), lf = lfs.length ? lfs[lfs.length - 1] : null;
+        if (!doc.getElementById('delc-pg-css')) { var st = doc.createElement('style'); st.id = 'delc-pg-css'; st.textContent = PRINT_CSS; (doc.head || doc.body).appendChild(st); }
+        var t = doc.createElement('table'); t.className = 'delc-pg';
+        t.innerHTML = '<thead><tr><td></td></tr></thead>' + (lf ? '<tfoot><tr><td></td></tr></tfoot>' : '') + '<tbody><tr><td></td></tr></tbody>';
+        t.tHead.rows[0].cells[0].appendChild(lh); if (lf) t.tFoot.rows[0].cells[0].appendChild(lf);
+        var cell = t.tBodies[0].rows[0].cells[0];
+        Array.prototype.slice.call(root.childNodes).forEach(function (n) { if (n.nodeName !== 'SCRIPT') cell.appendChild(n); });
+        root.insertBefore(t, root.firstChild);
+      } catch (e) { /* printing still works without repeating headers */ }
+    },
+    pageWrap: function (head, body, foot) {
+      return '<table class="delc-pg"><thead><tr><td>' + (head || '') + '</td></tr></thead>' + (foot ? '<tfoot><tr><td>' + foot + '</td></tr></tfoot>' : '') + '<tbody><tr><td>' + (body || '') + '</td></tr></tbody></table>'; }
   };
 })();
